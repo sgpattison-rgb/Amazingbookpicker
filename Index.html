@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Amazing Book Picker</title>
+  <style>
+    :root {
+      --bg-color: #f4f4f9;
+      --card-bg: #ffffff;
+      --primary: #4a90e2;
+      --danger: #e74c3c;
+      --text: #333333;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .app-container {
+      background: var(--card-bg);
+      width: 100%;
+      max-width: 400px;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-top: 0;
+      color: #2c3e50;
+    }
+
+    .display-card {
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border: 2px dashed #e0e0e0;
+      border-radius: 12px;
+      padding: 16px;
+      margin: 20px 0;
+      background-color: #fafafa;
+    }
+
+    .book-title {
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .book-author {
+      font-size: 1rem;
+      color: #666;
+      font-style: italic;
+    }
+
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .btn-pick {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-read {
+      background-color: var(--danger);
+      color: white;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <h1>The Amazing Book Picker</h1>
+    
+    <div class="display-card" id="bookCard">
+      <div class="book-title" id="titleText">Tap below to pick!</div>
+      <div class="book-author" id="authorText"></div>
+    </div>
+
+    <div class="button-group">
+      <button class="btn-pick" id="pickBtn" onclick="getPick()">Random Book Please</button>
+      <button class="btn-read" id="readBtn" onclick="markAsRead()" style="display: none;">Already Read</button>
+    </div>
+
+    <div class="status" id="statusText"></div>
+  </div>
+
+  <script>
+    // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwsCJJGXojy5bKHitOJJK2CG98YWumnB4kETq65-yS7N1jRy0qEsboe4q-cZkKRrURi/exec';
+
+    let booksList = [];
+    let currentBook = null;
+
+    async function fetchBooks() {
+      document.getElementById('statusText').innerText = 'Loading library...';
+      try {
+        const response = await fetch(SCRIPT_URL);
+        booksList = await response.json();
+        document.getElementById('statusText').innerText = `${booksList.length} books available.`;
+      } catch (err) {
+        document.getElementById('statusText').innerText = 'Error loading sheet data.';
+      }
+    }
+
+    async function getPick() {
+      if (booksList.length === 0) {
+        await fetchBooks();
+      }
+
+      if (booksList.length === 0) {
+        document.getElementById('titleText').innerText = "No books left!";
+        document.getElementById('authorText').innerText = "";
+        document.getElementById('readBtn').style.display = "none";
+        return;
+      }
+
+      const randomIndex = Math.floor(Math.random() * booksList.length);
+      currentBook = booksList[randomIndex];
+
+      document.getElementById('titleText').innerText = currentBook.title;
+      document.getElementById('authorText').innerText = `by ${currentBook.author}`;
+      document.getElementById('readBtn').style.display = "block";
+    }
+
+    async function markAsRead() {
+      if (!currentBook) return;
+
+      const pickBtn = document.getElementById('pickBtn');
+      const readBtn = document.getElementById('readBtn');
+      pickBtn.disabled = true;
+      readBtn.disabled = true;
+
+      document.getElementById('statusText').innerText = 'Removing from sheet...';
+
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ row: currentBook.row })
+        });
+
+        // Remove from local array
+        booksList = booksList.filter(b => b.row !== currentBook.row);
+        
+        document.getElementById('titleText').innerText = "Marked as read!";
+        document.getElementById('authorText').innerText = "";
+        document.getElementById('readBtn').style.display = "none";
+        document.getElementById('statusText').innerText = 'Sheet updated successfully.';
+        
+        // Refresh local cache to ensure row indices stay updated
+        fetchBooks();
+      } catch (err) {
+        document.getElementById('statusText').innerText = 'Failed to update sheet.';
+      } finally {
+        pickBtn.disabled = false;
+        readBtn.disabled = false;
+      }
+    }
+
+    // Load initial book list on start
+    fetchBooks();
+  </script>
+</body>
+</html>
